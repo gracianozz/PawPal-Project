@@ -12,10 +12,23 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+
+- The classes chosen I chose are the Owner,Pet,Task, and Scheduler classes.
+- Each class stores and represents different information:
+- The owner class stores basic owner information, such as name, phone number, email, and list of pets owned.
+- The pet class stores pet information, like pet name, breed, animal type, and tasks related to the pet.
+- The task class stores task information, like the task name, duration, and priority.
+- The Scheduler class will create and store a whole schedule with information like date, name, the daily plan, the task for the time, and the status(where the task is marked as complete or not).
+
+- Some responsibilities are that the owner can add, remove, or edit information about a pet. The task class can add, remove, and edit information about a task inputted.
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+- Yes, my design did change during implementation. One change that occured during implementation is ensuring the logic of marking a task complete will ensure to update the status, since copilot noticed that there should be a is_complete bool to ensure. Now, the system will check that a task is correctly marked as complete or not.
+
 
 ---
 
