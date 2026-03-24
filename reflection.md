@@ -2,6 +2,11 @@
 
 ## 1. System Design
 
+- Three core actions a user should be able to perform with this application are:
+- Add Pets
+- Add tasks for pets
+- Display all tasks added
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
