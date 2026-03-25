@@ -187,6 +187,28 @@ class TestOwnerPetTaskIntegration:
         assert len(tasks_by_pet["Luna"]) == 1
 
 
+class TestTaskSorting:
+    """Test suite for task sorting behavior."""
+
+    def test_sort_tasks_by_time_returns_chronological_order(self):
+        owner = Owner("OWN-010", "Jules", "555-7777", "jules@example.com")
+        pet = Pet("Sunny", "Corgi", "Dog")
+        owner.add_pet(pet)
+
+        later_task = Task("Evening walk", datetime(2026, 3, 24, 18, 0), "Daily")
+        earliest_task = Task("Breakfast", datetime(2026, 3, 24, 7, 30), "Daily")
+        middle_task = Task("Noon check-in", datetime(2026, 3, 24, 12, 0), "Daily")
+
+        pet.add_task(later_task)
+        pet.add_task(earliest_task)
+        pet.add_task(middle_task)
+
+        scheduler = Scheduler(owner)
+        sorted_tasks = scheduler.sort_tasks_by_time()
+
+        assert sorted_tasks == [earliest_task, middle_task, later_task]
+
+
 class TestTaskRecurrence:
     """Test suite for automatic recurrence generation."""
 
