@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 from pathlib import Path
 
@@ -185,3 +185,129 @@ class TestOwnerPetTaskIntegration:
         assert "Luna" in tasks_by_pet
         assert len(tasks_by_pet["Max"]) == 2
         assert len(tasks_by_pet["Luna"]) == 1
+
+
+class TestTaskRecurrence:
+    """Test suite for automatic recurrence generation."""
+
+    def test_mark_daily_task_complete_creates_next_occurrence(self):
+        owner = Owner("OWN-003", "Cara", "555-9999", "cara@example.com")
+        pet = Pet("Nova", "Beagle", "Dog")
+        owner.add_pet(pet)
+
+        scheduled_time = datetime(2026, 3, 24, 8, 0)
+        daily_task = Task("Morning walk", scheduled_time, "Daily")
+        pet.add_task(daily_task)
+
+        scheduler = Scheduler(owner)
+        scheduler.mark_task_complete(daily_task)
+
+        assert daily_task.is_complete is True
+        assert len(pet.tasks) == 2
+
+        next_task = [task for task in pet.tasks if task is not daily_task][0]
+        assert next_task.description == daily_task.description
+        assert next_task.frequency == daily_task.frequency
+        expected_next_date = (datetime.now() + timedelta(days=1)).date()
+        assert next_task.scheduled_time.date() == expected_next_date
+        assert next_task.scheduled_time.time() == scheduled_time.time()
+        assert next_task.is_complete is False
+
+    def test_mark_weekly_task_complete_creates_next_occurrence(self):
+        owner = Owner("OWN-004", "Drew", "555-1111", "drew@example.com")
+        pet = Pet("Pip", "Maine Coon", "Cat")
+        owner.add_pet(pet)
+
+        scheduled_time = datetime(2026, 3, 24, 18, 30)
+        weekly_task = Task("Litter deep clean", scheduled_time, "Weekly")
+        pet.add_task(weekly_task)
+
+        scheduler = Scheduler(owner)
+        scheduler.mark_task_complete(weekly_task)
+
+        assert len(pet.tasks) == 2
+        next_task = [task for task in pet.tasks if task is not weekly_task][0]
+        expected_next_date = (datetime.now() + timedelta(days=7)).date()
+        assert next_task.scheduled_time.date() == expected_next_date
+        assert next_task.scheduled_time.time() == scheduled_time.time()
+
+    def test_mark_non_recurring_task_complete_does_not_create_new_task(self):
+        owner = Owner("OWN-005", "Evan", "555-2222", "evan@example.com")
+        pet = Pet("Skye", "Mix", "Dog")
+        owner.add_pet(pet)
+
+        one_time_task = Task("Vet appointment", datetime(2026, 3, 24, 14, 0), "Once")
+        pet.add_task(one_time_task)
+
+        scheduler = Scheduler(owner)
+        scheduler.mark_task_complete(one_time_task)
+
+        assert one_time_task.is_complete is True
+        assert len(pet.tasks) == 1
+
+    def test_mark_already_completed_task_does_not_duplicate_next_occurrence(self):
+        owner = Owner("OWN-006", "Fran", "555-3333", "fran@example.com")
+        pet = Pet("Echo", "Spaniel", "Dog")
+        owner.add_pet(pet)
+
+        daily_task = Task("Evening walk", datetime(2026, 3, 24, 19, 0), "Daily")
+        pet.add_task(daily_task)
+
+        scheduler = Scheduler(owner)
+        scheduler.mark_task_complete(daily_task)
+        scheduler.mark_task_complete(daily_task)
+
+        assert len(pet.tasks) == 2
+
+
+class TestTaskConflictDetection:
+    """Test suite for lightweight schedule conflict detection."""
+
+    def test_detects_overlapping_tasks_for_same_pet(self):
+        owner = Owner("OWN-007", "Gina", "555-4444", "gina@example.com")
+        pet = Pet("Blue", "Poodle", "Dog")
+        owner.add_pet(pet)
+
+        conflict_time = datetime(2026, 3, 24, 9, 0)
+        pet.add_task(Task("Feed", conflict_time, "Daily"))
+        pet.add_task(Task("Walk", conflict_time, "Daily"))
+
+        scheduler = Scheduler(owner)
+        warnings = scheduler.detect_task_conflicts()
+
+        assert len(warnings) == 1
+        assert "Blue has overlapping tasks" in warnings[0]
+        assert "Feed" in warnings[0]
+        assert "Walk" in warnings[0]
+
+    def test_detects_overlapping_tasks_for_different_pets(self):
+        owner = Owner("OWN-008", "Hank", "555-5555", "hank@example.com")
+        pet_one = Pet("Nala", "Shiba", "Dog")
+        pet_two = Pet("Mochi", "Bengal", "Cat")
+        owner.add_pet(pet_one)
+        owner.add_pet(pet_two)
+
+        conflict_time = datetime(2026, 3, 24, 10, 30)
+        pet_one.add_task(Task("Nala breakfast", conflict_time, "Daily"))
+        pet_two.add_task(Task("Mochi breakfast", conflict_time, "Daily"))
+
+        scheduler = Scheduler(owner)
+        warnings = scheduler.detect_task_conflicts()
+
+        assert len(warnings) == 1
+        assert "Multiple pets have tasks" in warnings[0]
+        assert "Mochi" in warnings[0]
+        assert "Nala" in warnings[0]
+
+    def test_returns_no_warnings_when_no_overlap_exists(self):
+        owner = Owner("OWN-009", "Ivy", "555-6666", "ivy@example.com")
+        pet = Pet("Rex", "Mixed", "Dog")
+        owner.add_pet(pet)
+
+        pet.add_task(Task("Morning feed", datetime(2026, 3, 24, 8, 0), "Daily"))
+        pet.add_task(Task("Evening walk", datetime(2026, 3, 24, 18, 0), "Daily"))
+
+        scheduler = Scheduler(owner)
+        warnings = scheduler.detect_task_conflicts()
+
+        assert warnings == []
