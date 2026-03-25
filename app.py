@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-from pawpal_system import Owner, Pet, Task 
+from pawpal_system import Owner, Pet, Task, Scheduler
 
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
@@ -106,9 +106,9 @@ elif st.session_state.owner is not None:
     st.info("No pets yet. Add one above.")
 
 st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+st.caption("Add a few tasks with a selected time. In your final version, these should feed into your scheduler.")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     task_title = st.text_input("Task title", value="Morning walk")
 with col2:
@@ -116,6 +116,8 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 with col4:
+    task_time = st.time_input("Task time", value=datetime.now().replace(second=0, microsecond=0).time())
+with col5:
     pet_options = [pet.name for pet in st.session_state.owner.pets] if st.session_state.owner else []
     selected_pet_name = st.selectbox("Pet", pet_options, disabled=not pet_options)
 
@@ -133,10 +135,11 @@ if st.button("Add task"):
             st.warning("Please enter a task title.")
         else:
             task_description = f"{clean_task_title} ({int(duration)} min, {priority})"
+            scheduled_datetime = datetime.combine(datetime.now().date(), task_time)
             selected_pet.add_task(
                 Task(
                     description=task_description,
-                    scheduled_time=datetime.now(),
+                    scheduled_time=scheduled_datetime,
                     frequency=priority,
                 )
             )
@@ -144,22 +147,36 @@ if st.button("Add task"):
 
 if st.session_state.owner is not None:
     all_tasks = st.session_state.owner.get_all_pet_tasks()
+    scheduler = Scheduler(st.session_state.owner)
 else:
     all_tasks = []
+    scheduler = None
 
 if all_tasks:
+    conflict_warnings = scheduler.detect_task_conflicts() if scheduler is not None else []
+    if conflict_warnings:
+        st.warning("Schedule conflict warnings:")
+        for warning in conflict_warnings:
+            st.write(f"- {warning}")
+
+    tasks_by_pet = scheduler.get_tasks_by_pet() if scheduler is not None else {}
+    pet_name_by_task_id = {}
+    for pet_name, pet_tasks in tasks_by_pet.items():
+        for task in pet_tasks:
+            pet_name_by_task_id[id(task)] = pet_name
+
     st.write("Current tasks:")
     task_rows = []
-    for pet in st.session_state.owner.pets:
-        for task in pet.tasks:
-            task_rows.append(
-                {
-                    "pet": pet.name,
-                    "description": task.description,
-                    "frequency": task.frequency,
-                    "complete": task.is_complete,
-                }
-            )
+    for task in scheduler.sort_tasks_by_time():
+        task_rows.append(
+            {
+                "pet": pet_name_by_task_id.get(id(task), "Unknown Pet"),
+                "scheduled_time": task.get_display_time(),
+                "description": task.description,
+                "frequency": task.frequency,
+                "complete": task.is_complete,
+            }
+        )
     st.table(task_rows)
 else:
     st.info("No tasks yet. Add one above.")
@@ -167,18 +184,38 @@ else:
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+st.caption("Generate a sorted schedule and view any conflict warnings.")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    if scheduler is None:
+        st.warning("Save an owner first.")
+    elif not scheduler.tasks:
+        st.info("No tasks available to schedule.")
+    else:
+        st.success("Schedule generated.")
+
+        schedule_rows = []
+        tasks_by_pet = scheduler.get_tasks_by_pet()
+        pet_name_by_task_id = {}
+        for pet_name, pet_tasks in tasks_by_pet.items():
+            for task in pet_tasks:
+                pet_name_by_task_id[id(task)] = pet_name
+
+        for task in scheduler.sort_tasks_by_time():
+            schedule_rows.append(
+                {
+                    "time": task.get_display_time(),
+                    "pet": pet_name_by_task_id.get(id(task), "Unknown Pet"),
+                    "task": task.description,
+                    "status": "Complete" if task.is_complete else "Pending",
+                }
+            )
+        st.table(schedule_rows)
+
+        conflict_warnings = scheduler.detect_task_conflicts()
+        if conflict_warnings:
+            st.warning("Conflict warnings:")
+            for warning in conflict_warnings:
+                st.write(f"- {warning}")
+        else:
+            st.info("No schedule conflicts detected.")

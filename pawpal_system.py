@@ -105,18 +105,18 @@ class Scheduler:
 		self.owner = owner
 		self.tasks = self.owner.get_all_pet_tasks()
 
-	def _task_entries(self):
+	def _task_entries(self): #Helper generator to yield (pet, task) pairs for all tasks across all pets, used for conflict detection and other operations that need pet context
 		for pet in self.owner.pets:
 			for task in pet.tasks:
 				yield pet, task
 
-	def _find_pet_for_task(self, task):
+	def _find_pet_for_task(self, task): #Helper method to find which pet a task belongs to by searching through all pets and their tasks
 		for pet in self.owner.pets:
 			if task in pet.tasks:
 				return pet
 		return None
 
-	def _get_recurrence_delta(self, frequency):
+	def _get_recurrence_delta(self, frequency): #Convert a frequency string to a timedelta for calculating the next scheduled time
 		normalized_frequency = frequency.strip().lower()
 		if normalized_frequency == "daily":
 			return timedelta(days=1)
